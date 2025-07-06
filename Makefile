@@ -5,14 +5,15 @@ SLASH	:= /
 
 V       := @
 
-#ifndef GCCPREFIX
 GCCPREFIX := riscv64-unknown-elf-
-#endif
 
 ifndef QEMU
 QEMU := qemu-system-riscv64
 endif
 
+ifndef SPIKE
+SPIKE := spike
+endif
 
 # eliminate default suffix rules
 .SUFFIXES: .c .S .h
@@ -56,6 +57,7 @@ ALLOBJS	:=
 ALLDEPS	:=
 TARGETS	:=
 
+# include some predefined function
 include tools/function.mk
 
 listf_cc = $(call listf,$(1),$(CTYPE))
@@ -80,7 +82,7 @@ match = $(shell echo $(2) | $(AWK) '{for(i=1;i<=NF;i++){if(match("$(1)","^"$$(i)
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # include kernel/user
 
-INCLUDE	+= libs 
+INCLUDE	+= libs/
 
 CFLAGS	+= $(addprefix -I,$(INCLUDE))
 
@@ -94,13 +96,12 @@ $(call add_files_cc,$(call listf_cc,$(LIBDIR)),libs,)
 KINCLUDE	+= kern/debug/ \
 			   kern/driver/ \
 			   kern/trap/ \
-			   kern/libs/\
 			   kern/mm/ \
 			   kern/arch/
 
 KSRCDIR		+= kern/init \
-			   kern/debug \
 			   kern/libs \
+			   kern/debug \
 			   kern/driver \
 			   kern/trap \
 			   kern/mm
@@ -128,6 +129,8 @@ $(call create_target,kernel)
 # create ucore.img
 UCOREIMG	:= $(call totarget,ucore.img)
 
+# $(UCOREIMG): $(kernel)
+#	cd ../../riscv-pk && rm -rf build && mkdir build && cd build && ../configure --prefix=$(RISCV) --host=riscv64-unknown-elf --with-payload=../../labcodes/$(PROJ)/$(kernel)  --disable-fp-emulation && make && cp bbl ../../labcodes/$(PROJ)/$(UCOREIMG)
 
 $(UCOREIMG): $(kernel)
 	$(OBJCOPY) $(kernel) --strip-all -O binary $@
@@ -164,7 +167,7 @@ TARGETS: $(TARGETS)
 
 .DEFAULT_GOAL := TARGETS
 
-.PHONY: qemu 
+.PHONY: qemu spike
 qemu: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 #	$(V)$(QEMU) -kernel $(UCOREIMG) -nographic
 	$(V)$(QEMU) \
@@ -175,6 +178,9 @@ qemu: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 
 all: $(KERNELIMG)
 	cp bin/k210.bin k210.bin
+
+spike: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
+	$(V)$(SPIKE) $(UCOREIMG)
 
 .PHONY: grade touch
 
